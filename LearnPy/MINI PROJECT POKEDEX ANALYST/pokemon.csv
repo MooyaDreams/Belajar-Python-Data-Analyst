@@ -1,0 +1,11 @@
+Nama,Tipe,Attack,Defense,Speed,Legendary
+Pikachu,Electric,55,40,90,False
+Charizard,Fire,84,78,100,False
+Squirtle,Water,48,65,43,False
+Mewtwo,Psychic,110,90,130,True
+Onix,Rock,45,160,70,False
+Bulbasaur,Grass,49,49,45,False
+Gengar,Ghost,65,60,110,False
+Dragonite,Dragon,134,95,80,False
+Magikarp,Water,10,55,80,False
+Arceus,Normal,120,120,120,True
