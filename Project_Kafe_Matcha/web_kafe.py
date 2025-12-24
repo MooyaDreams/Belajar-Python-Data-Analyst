@@ -5,6 +5,8 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
 from datetime import datetime
+from sklearn.linear_model import LinearRegression 
+import matplotlib.pyplot as plt 
 
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Matcha Cafe System", page_icon="🍵")
@@ -37,7 +39,7 @@ def konek_gsheet():
 # --- 3. UI WEBSITE ---
 st.title("🍵 Matcha Cafe System")
 st.sidebar.header("Navigasi")
-menu_navigasi = st.sidebar.radio("Pilih Halaman:", ["Pesan Makanan", "Dapur (Koki)"])
+menu_navigasi = st.sidebar.radio("Pilih Halaman:", ["Pesan Makanan", "Dapur (Koki)", "Peramal Cuan 🔮"])
 
 # ==========================================
 # HALAMAN 1: PESAN MAKANAN
@@ -137,3 +139,56 @@ elif menu_navigasi == "Dapur (Koki)":
             
     except Exception as e:
         st.error(f"Error memuat data dapur: {e}")
+
+# ==========================================
+# HALAMAN 3: PERAMAL CUAN (MACHINE LEARNING)
+# ==========================================
+elif menu_navigasi == "Peramal Cuan 🔮":
+    st.header("🔮 Peramal Masa Depan Kafe")
+    st.write("Gunakan Machine Learning untuk memprediksi penjualan berdasarkan cuaca!")
+
+    # 1. DATA (DUMMY/LATIHAN)
+    # Ceritanya ini data historis toko kamu
+    data_latih = {
+        'Suhu': [26, 30, 32, 24, 35, 28, 22, 33, 29, 27],
+        'Jual': [40, 65, 75, 35, 90, 50, 25, 85, 60, 45]
+    }
+    df_latih = pd.DataFrame(data_latih)
+
+    # Tampilkan Data Latih kalau mau lihat
+    with st.expander("Lihat Data Historis"):
+        st.dataframe(df_latih)
+
+    # 2. TRAINING MODEL (LATIH OTAK)
+    model = LinearRegression()
+    model.fit(df_latih[['Suhu']], df_latih['Jual'])
+
+    # 3. INPUT USER
+    st.divider()
+    st.subheader("Cek Prediksi Besok")
+    suhu_input = st.slider("Perkiraan Suhu Besok (°C):", 20, 40, 30)
+
+    # 4. PREDIKSI
+    if st.button("Ramal Sekarang! 🎩"):
+        # Bungkus input jadi DataFrame (Biar gak warning kayak tadi)
+        input_df = pd.DataFrame({'Suhu': [suhu_input]})
+        
+        # Prediksi
+        hasil_prediksi = model.predict(input_df)
+        hasil_bulat = int(hasil_prediksi[0])
+        
+        st.success(f"🌡️ Jika suhu {suhu_input}°C, kemungkinan laku **{hasil_bulat} Gelas**!")
+        
+        # Visualisasi Grafik di Web
+        fig, ax = plt.subplots()
+        ax.scatter(df_latih['Suhu'], df_latih['Jual'], color='blue', label='Data Historis')
+        ax.plot(df_latih['Suhu'], model.predict(df_latih[['Suhu']]), color='red', label='Trend Garis')
+        
+        # Tambah titik prediksi user (Warna Hijau)
+        ax.scatter([suhu_input], [hasil_bulat], color='green', s=100, zorder=5, label='Prediksi Kamu')
+        
+        ax.set_xlabel('Suhu')
+        ax.set_ylabel('Penjualan')
+        ax.legend()
+        
+        st.pyplot(fig) # Tampilkan grafik matplotlib di streamlit
