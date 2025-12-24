@@ -6,7 +6,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import os
 from datetime import datetime
 from sklearn.linear_model import LinearRegression 
-import matplotlib.pyplot as plt 
+import plotly.graph_objects as go # Library grafik interaktif (Kita pakai ini sekarang!)
 
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Matcha Cafe System", page_icon="🍵")
@@ -32,7 +32,6 @@ def konek_gsheet():
         creds = ServiceAccountCredentials.from_json_keyfile_dict(info_json, scope)
 
     client = gspread.authorize(creds)
-    # Pastikan nama ini SAMA PERSIS dengan nama Google Sheet kamu
     sheet = client.open("Database Kafe Matcha").sheet1 
     return sheet
 
@@ -55,7 +54,6 @@ if menu_navigasi == "Pesan Makanan":
         meja = st.number_input("Nomor Meja", min_value=1, value=1)
 
     # --- BAGIAN MENU (AMBIL DARI SQLITE) ---
-    # Kita pakai konek_sqlite() karena menu tersimpan di file .db laptop
     try:
         koneksi_sql = konek_sqlite()
         cursor = koneksi_sql.cursor()
@@ -92,7 +90,6 @@ if menu_navigasi == "Pesan Makanan":
                         pesanan_str = ", ".join(pesanan_user)
                         waktu_skrg = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         
-                        # Masukkan data ke baris baru
                         sheet.append_row([nama, meja, pesanan_str, total_harga, waktu_skrg])
                         
                         st.success(f"✅ Pesanan Kak {nama} berhasil dikirim ke Cloud! ☁️")
@@ -104,7 +101,7 @@ if menu_navigasi == "Pesan Makanan":
     except Exception as e:
         st.error(f"Gagal ambil menu dari database: {e}")
 
-    # Tampilkan Menu Lengkap (Pake Pandas baca dari SQLite)
+    # Tampilkan Menu Lengkap
     st.divider()
     st.subheader("Daftar Menu Lengkap")
     koneksi_sql = konek_sqlite()
@@ -123,18 +120,14 @@ elif menu_navigasi == "Dapur (Koki)":
         st.rerun()
 
     try:
-        # --- AMBIL DARI GOOGLE SHEETS ---
         sheet = konek_gsheet()
-        data_semua = sheet.get_all_records() # Ini cara baca Google Sheet (bukan SELECT *)
+        data_semua = sheet.get_all_records()
         
         if len(data_semua) == 0:
             st.warning("Belum ada pesanan masuk.")
         else:
             df_pesanan = pd.DataFrame(data_semua)
-            # Tampilkan yang terbaru di atas (Sortir pandas manual)
-            # (Opsional: kalau mau dibalik urutannya)
             df_pesanan = df_pesanan.iloc[::-1] 
-            
             st.dataframe(df_pesanan, use_container_width=True)
             
     except Exception as e:
@@ -147,19 +140,17 @@ elif menu_navigasi == "Peramal Cuan 🔮":
     st.header("🔮 Peramal Masa Depan Kafe")
     st.write("Gunakan Machine Learning untuk memprediksi penjualan berdasarkan cuaca!")
 
-    # 1. DATA (DUMMY/LATIHAN)
-    # Ceritanya ini data historis toko kamu
+    # 1. DATA HISTORIS
     data_latih = {
         'Suhu': [26, 30, 32, 24, 35, 28, 22, 33, 29, 27],
         'Jual': [40, 65, 75, 35, 90, 50, 25, 85, 60, 45]
     }
     df_latih = pd.DataFrame(data_latih)
 
-    # Tampilkan Data Latih kalau mau lihat
     with st.expander("Lihat Data Historis"):
         st.dataframe(df_latih)
 
-    # 2. TRAINING MODEL (LATIH OTAK)
+    # 2. TRAINING MODEL
     model = LinearRegression()
     model.fit(df_latih[['Suhu']], df_latih['Jual'])
 
@@ -168,27 +159,51 @@ elif menu_navigasi == "Peramal Cuan 🔮":
     st.subheader("Cek Prediksi Besok")
     suhu_input = st.slider("Perkiraan Suhu Besok (°C):", 20, 40, 30)
 
-    # 4. PREDIKSI
+    # 4. PREDIKSI & VISUALISASI
     if st.button("Ramal Sekarang! 🎩"):
-        # Bungkus input jadi DataFrame (Biar gak warning kayak tadi)
         input_df = pd.DataFrame({'Suhu': [suhu_input]})
         
-        # Prediksi
+        # Hitung Prediksi
         hasil_prediksi = model.predict(input_df)
         hasil_bulat = int(hasil_prediksi[0])
         
         st.success(f"🌡️ Jika suhu {suhu_input}°C, kemungkinan laku **{hasil_bulat} Gelas**!")
         
-        # Visualisasi Grafik di Web
-        fig, ax = plt.subplots()
-        ax.scatter(df_latih['Suhu'], df_latih['Jual'], color='blue', label='Data Historis')
-        ax.plot(df_latih['Suhu'], model.predict(df_latih[['Suhu']]), color='red', label='Trend Garis')
-        
-        # Tambah titik prediksi user (Warna Hijau)
-        ax.scatter([suhu_input], [hasil_bulat], color='green', s=100, zorder=5, label='Prediksi Kamu')
-        
-        ax.set_xlabel('Suhu')
-        ax.set_ylabel('Penjualan')
-        ax.legend()
-        
-        st.pyplot(fig) # Tampilkan grafik matplotlib di streamlit
+        # --- VISUALISASI INTERAKTIF (PLOTLY) ---
+        fig = go.Figure()
+
+        # A. Data Asli (Titik Biru)
+        fig.add_trace(go.Scatter(
+            x=df_latih['Suhu'], 
+            y=df_latih['Jual'],
+            mode='markers',
+            name='Data Asli',
+            marker=dict(color='blue', size=10)
+        ))
+
+        # B. Garis Ramalan (Garis Merah)
+        fig.add_trace(go.Scatter(
+            x=df_latih['Suhu'], 
+            y=model.predict(df_latih[['Suhu']]),
+            mode='lines',
+            name='Trend Garis',
+            line=dict(color='red', width=2)
+        ))
+
+        # C. Prediksi Kamu (Bintang Hijau)
+        fig.add_trace(go.Scatter(
+            x=[suhu_input],
+            y=[hasil_bulat],
+            mode='markers',
+            name='Prediksi Kamu',
+            marker=dict(color='green', size=20, symbol='star')
+        ))
+
+        fig.update_layout(
+            title="Analisis Prediksi Penjualan",
+            xaxis_title="Suhu Udara (°C)",
+            yaxis_title="Penjualan (Gelas)",
+            hovermode="x unified"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
